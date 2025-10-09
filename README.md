@@ -26,7 +26,7 @@ Note: I recommend using something like [python-dotenv](https://pypi.org/project/
 LIBRE_LINK_UP_USERNAME=...
 LIBRE_LINK_UP_PASSWORD=...
 LIBRE_LINK_UP_URL=https://api-eu2.libreview.io
-LIBRE_LINK_UP_VERSION=4.7.0  # Optional
+LIBRE_LINK_UP_VERSION=4.16.0  # Optional
 ```
 
 The url for `LIBRE_LINK_UP_URL` may be different depending on where you live, current [options](src/libre_link_up/types.py), also see [here](https://gist.github.com/khskekec/6c13ba01b10d3018d816706a32ae8ab2) for more information.
@@ -44,7 +44,7 @@ client = LibreLinkUpClient(
     username=os.environ["LIBRE_LINK_UP_USERNAME"],
     password=os.environ["LIBRE_LINK_UP_PASSWORD"],
     url=os.environ["LIBRE_LINK_UP_URL"],
-    version="4.7.0",
+    version="4.16.0",
 )
 client.login()
 glucose_data = client.get_latest_reading()

@@ -20,7 +20,7 @@ if __name__ == "__main__":
         username=os.environ["LIBRE_LINK_UP_USERNAME"],
         password=os.environ["LIBRE_LINK_UP_PASSWORD"],
         url=os.environ["LIBRE_LINK_UP_URL"],
-        version="4.7.0",
+        version="4.16.0",
     )
     client.login()
 

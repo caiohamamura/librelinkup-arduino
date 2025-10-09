@@ -10,7 +10,7 @@ client = LibreLinkUpClient(
     username=os.environ["LIBRE_LINK_UP_USERNAME"],
     password=os.environ["LIBRE_LINK_UP_PASSWORD"],
     url=os.environ["LIBRE_LINK_UP_URL"],
-    version="4.8.0",
+    version="4.16.0",
 )
 
 client.login()

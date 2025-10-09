@@ -55,21 +55,35 @@ def test_get_graph_data(client: LibreLinkUpClient) -> None:
 
 
 @pytest.mark.dependency(depends=["test_login"])
-def test_get_raw_logbook_data(client: LibreLinkUpClient) -> None:
+def test_get_raw_logbook_data(client: LibreLinkUpClient, capsys) -> None:
     logbook_data = client.get_raw_logbook_readings()
+    captured = capsys.readouterr()
+
+    # Check that the warning message was printed
+    assert (
+        "Error: Logbook readings have been removed from the LibreLinkUp API"
+        in captured.out
+    )
+
+    # Check that empty data is returned
     assert "data" in logbook_data
-    assert len(logbook_data["data"]) > 0
-    assert logbook_data["data"][0]["Value"] is not None
+    assert len(logbook_data["data"]) == 0
 
 
 @pytest.mark.dependency(depends=["test_login"])
-def test_get_logbook_data(client: LibreLinkUpClient) -> None:
+def test_get_logbook_data(client: LibreLinkUpClient, capsys) -> None:
     logbook_data = client.get_logbook_readings()
-    assert len(logbook_data) > 0
-    assert logbook_data[0].unix_timestamp is not None
-    assert logbook_data[0].value is not None
-    assert logbook_data[0].value_in_mg_per_dl is not None
-    assert logbook_data[0].source == ReadingSource.LOGBOOK
+    captured = capsys.readouterr()
+
+    # Check that the warning message was printed
+    assert (
+        "Error: Logbook readings have been removed from the LibreLinkUp API"
+        in captured.out
+    )
+
+    # Check that empty list is returned
+    assert len(logbook_data) == 0
+    assert isinstance(logbook_data, list)
 
 
 @pytest.mark.dependency(depends=["test_login"])

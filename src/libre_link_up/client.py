@@ -1,5 +1,4 @@
 from datetime import datetime
-import hashlib
 from typing import Any, Optional
 from libre_link_up.custom_types import (
     GlucoseSensorReading,
@@ -8,10 +7,7 @@ from libre_link_up.custom_types import (
     ReadingSource,
 )
 import requests
-from datetime import datetime
-from typing import Any, Optional
 from pytz import timezone
-import requests
 from hashlib import sha256
 
 
@@ -32,7 +28,7 @@ class LibreLinkUpClient:
         username: str,
         password: str,
         url: LibreLinkUpUrl = LibreLinkUpUrl.EU,
-        version: str = "4.7.0",
+        version: str = "4.16.0",
     ):
         """
         Create a new LibreLinkUpClient instance
@@ -41,9 +37,30 @@ class LibreLinkUpClient:
 
         Example usage:
         ```
-        client = LibreLinkUpClient(username="...", password="...", url=LibreLinkUpUrl.EU, version="4.7.0")
+        client = LibreLinkUpClient(username="...", password="...", url=LibreLinkUpUrl.EU, version="4.16.0")
         ```
         """
+        # Check if version is 4.16.0 or higher
+        try:
+            version_parts = [int(x) for x in version.split(".")]
+            if len(version_parts) >= 3:
+                major, minor = version_parts[0], version_parts[1]
+                if major < 4 or (major == 4 and minor < 16):
+                    raise ValueError(
+                        f"Version {version} is not supported. LibreLinkUp API now requires version 4.16.0 or higher."
+                    )
+            else:
+                raise ValueError(
+                    f"Invalid version format: {version}. Expected format: X.Y.Z"
+                )
+        except ValueError as e:
+            if "not supported" in str(e) or "Invalid version format" in str(e):
+                raise e
+            else:
+                raise ValueError(
+                    f"Invalid version format: {version}. Expected format: X.Y.Z"
+                )
+
         self.username = username
         self.password = password
         self.url = url
@@ -55,7 +72,6 @@ class LibreLinkUpClient:
             "cache-control": "no-cache",
             "connection": "Keep-Alive",
             "content-type": "application/json",
-            "account-id" : "",
             "user-agent": "Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36",
         }
         self.jwt_token: Optional[str] = None
@@ -73,11 +89,19 @@ class LibreLinkUpClient:
         response.raise_for_status()
         login_response = response.json()
         if "data" not in login_response:
-            raise Exception(f"login response of unknown format: {login_response} with status code: {response.status_code}")
+            raise Exception(
+                f"login response of unknown format: {login_response} with status code: {response.status_code}"
+            )
         self.jwt_token = login_response["data"]["authTicket"]["token"]
         self.country = login_response["data"]["user"]["country"]
+
+        # Set authorization header
         self.headers["authorization"] = f"Bearer {self.jwt_token}"
-        self.headers["account-id"] = sha256((login_response["data"]["user"]["id"]).encode('utf-8')).hexdigest()
+
+        # Set account-id header (required for version 4.16.0+)
+        user_id = login_response["data"]["user"]["id"]
+        account_id = sha256(user_id.encode("utf-8")).hexdigest()
+        self.headers["Account-Id"] = account_id
 
     @property
     def connection(self) -> Connection:
@@ -186,13 +210,9 @@ class LibreLinkUpClient:
         Returns:
             Dict[str, Any]: Raw JSON response from the LibreLinkUp API
         """
-        response = requests.get(
-            f"{self.url}/llu/connections/{self.connection.patient_id}/logbook",
-            headers=self.headers,
-        )
-        response.raise_for_status()
-        logbook_data = response.json()
-        return logbook_data
+        error_msg = "Error: Logbook readings have been removed from the LibreLinkUp API and are no longer available."
+        print(error_msg)
+        return {"data": []}
 
     def get_logbook_readings(self) -> list[GlucoseSensorReading]:
         """
@@ -210,21 +230,9 @@ class LibreLinkUpClient:
                     ...
                 ]
         """
-        response = self.get_raw_logbook_readings()
-        logbook_data = []
-        for logbook_entry in response["data"]:
-            logbook_data.append(
-                GlucoseSensorReading(
-                    unix_timestamp=_convert_timestamp_string_to_datetime(
-                        logbook_entry["Timestamp"],
-                        self.country,
-                    ),
-                    value=logbook_entry["Value"],
-                    value_in_mg_per_dl=logbook_entry["ValueInMgPerDl"],
-                    source=ReadingSource.LOGBOOK,
-                )
-            )
-        return logbook_data
+        error_msg = "Error: Logbook readings have been removed from the LibreLinkUp API and are no longer available."
+        print(error_msg)
+        return []
 
     def get_latest_reading(self) -> GlucoseSensorReading:
         """
@@ -263,7 +271,7 @@ if __name__ == "__main__":
         username=os.environ["LIBRE_LINK_UP_USERNAME"],
         password=os.environ["LIBRE_LINK_UP_PASSWORD"],
         url=os.environ["LIBRE_LINK_UP_URL"],
-        version=os.getenv("LIBRE_LINK_UP_VERSION", "4.7.0"),
+        version=os.getenv("LIBRE_LINK_UP_VERSION", "4.16.0"),
     )
     client.login()
     print(client.get_graph_readings())
