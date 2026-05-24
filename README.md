@@ -66,6 +66,54 @@ The output should look something like:
 
 See the [examples](examples/) directory for more examples.
 
+## Arduino / PlatformIO
+
+This repository also includes an Arduino library for ESP32 and ESP8266.
+
+### PlatformIO usage
+
+If this repository is next to your PlatformIO project:
+
+```ini
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+lib_deps =
+    bblanchon/ArduinoJson @ ^7.0.0
+lib_extra_dirs = ../librelink
+```
+
+For ESP8266, use `platform = espressif8266` and an ESP8266 board such as
+`nodemcuv2`.
+
+### Arduino example
+
+```cpp
+#include <LibreLinkUp.h>
+
+LibreLinkUpClient libre(
+    "your-email@example.com",
+    "your-password",
+    "https://api.libreview.io"
+);
+
+LibreLinkUpReading reading;
+if (libre.getLatestReading(reading)) {
+    Serial.print("Glucose: ");
+    Serial.print(reading.valueMgDl);
+    Serial.println(" mg/dL");
+} else {
+    Serial.println(libre.lastError());
+}
+```
+
+Complete ESP32 and ESP8266 examples are in:
+
+- `examples/esp32_latest_reading`
+- `examples/esp8266_latest_reading`
+
 ## Contributing
 
 If you find a bug :bug:, please open a [bug report](https://github.com/smpurkis/libre-linkup-py/issues/new?assignees=&labels=bug&template=bug_report.md&title=).

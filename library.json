@@ -1,0 +1,34 @@
+{
+  "name": "LibreLinkUp",
+  "version": "0.1.0",
+  "description": "Arduino/PlatformIO client for reading the latest LibreLinkUp glucose value on ESP8266 and ESP32.",
+  "keywords": [
+    "librelinkup",
+    "libreview",
+    "glucose",
+    "esp8266",
+    "esp32"
+  ],
+  "authors": [
+    {
+      "name": "Caio Hamamura"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": [
+    "espressif8266",
+    "espressif32"
+  ],
+  "dependencies": [
+    {
+      "owner": "bblanchon",
+      "name": "ArduinoJson",
+      "version": "^7.0.0"
+    }
+  ],
+  "examples": [
+    "examples/esp32_latest_reading",
+    "examples/esp8266_latest_reading"
+  ]
+}
