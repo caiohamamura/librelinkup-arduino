@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 
 #if defined(ESP32)
+#include <esp_http_client.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #elif defined(ESP8266)
@@ -215,12 +216,30 @@ void LibreLinkUpClient::setup(uint8_t connectionIndex, unsigned long cacheDurati
     _lastUpdatedAt = 0;
     _hasReading = false;
     _updating = false;
+#if defined(ESP32)
+    _asyncPhase = AsyncPhase::Idle;
+    _asyncResponse = "";
+    _asyncBody = "";
+    _asyncPatientId = "";
+    _asyncPatientName = "";
+    if (_asyncClient) {
+        esp_http_client_cleanup(_asyncClient);
+        _asyncClient = nullptr;
+    }
+#endif
 }
 
 void LibreLinkUpClient::loop() {
+#if defined(ESP32)
+    if (_updating) {
+        pollAsyncRequest();
+        return;
+    }
+#else
     if (_updating) {
         return;
     }
+#endif
 
     unsigned long now = millis();
     bool cacheExpired = !_hasReading || (now - _lastUpdatedAt >= _cacheDurationMs);
@@ -228,7 +247,11 @@ void LibreLinkUpClient::loop() {
         return;
     }
 
+#if defined(ESP32)
+    startAsyncRefresh();
+#else
     updateNow();
+#endif
 }
 
 bool LibreLinkUpClient::updateNow() {
@@ -265,6 +288,250 @@ void LibreLinkUpClient::onUpdate(LibreLinkUpUpdateCallback callback) {
 void LibreLinkUpClient::onError(LibreLinkUpErrorCallback callback) {
     _errorCallback = callback;
 }
+
+#if defined(ESP32)
+bool LibreLinkUpClient::startAsyncRefresh() {
+    if (_updating) {
+        return false;
+    }
+
+    _updating = true;
+    _asyncPatientId = "";
+    _asyncPatientName = "";
+
+    if (_authToken.length() == 0) {
+        JsonDocument body;
+        body["email"] = _email;
+        body["password"] = _password;
+        String payload;
+        serializeJson(body, payload);
+        return startAsyncRequest("POST", "/llu/auth/login", payload, AsyncPhase::Login);
+    }
+
+    return startAsyncRequest("GET", "/llu/connections", "", AsyncPhase::Connections);
+}
+
+bool LibreLinkUpClient::startAsyncRequest(
+    const String& method,
+    const String& path,
+    const String& body,
+    AsyncPhase phase
+) {
+    if (_asyncClient) {
+        esp_http_client_cleanup(_asyncClient);
+        _asyncClient = nullptr;
+    }
+
+    _asyncResponse = "";
+    _asyncBody = body;
+    _asyncPhase = phase;
+
+    String url = _baseUrl + path;
+    esp_http_client_config_t config = {};
+    config.url = url.c_str();
+    config.event_handler = LibreLinkUpClient::handleAsyncEvent;
+    config.user_data = this;
+    config.is_async = true;
+    config.timeout_ms = 15000;
+    config.skip_cert_common_name_check = true;
+
+    _asyncClient = esp_http_client_init(&config);
+    if (!_asyncClient) {
+        failAsync("ESP32 async HTTP init failed for " + url);
+        return false;
+    }
+
+    esp_http_client_set_method(
+        _asyncClient,
+        method == "POST" ? HTTP_METHOD_POST : HTTP_METHOD_GET
+    );
+    esp_http_client_set_header(_asyncClient, "product", "llu.android");
+    esp_http_client_set_header(_asyncClient, "version", _version.c_str());
+    esp_http_client_set_header(_asyncClient, "Accept-Encoding", "identity");
+    esp_http_client_set_header(_asyncClient, "Cache-Control", "no-cache");
+    esp_http_client_set_header(_asyncClient, "Connection", "Keep-Alive");
+    esp_http_client_set_header(_asyncClient, "Content-Type", "application/json");
+    esp_http_client_set_header(
+        _asyncClient,
+        "User-Agent",
+        "Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36"
+    );
+    if (_authToken.length() > 0) {
+        String authorization = "Bearer " + _authToken;
+        esp_http_client_set_header(_asyncClient, "authorization", authorization.c_str());
+    }
+    if (_accountId.length() > 0) {
+        esp_http_client_set_header(_asyncClient, "Account-Id", _accountId.c_str());
+    }
+    if (method == "POST") {
+        esp_http_client_set_post_field(_asyncClient, _asyncBody.c_str(), _asyncBody.length());
+    }
+
+    pollAsyncRequest();
+    return true;
+}
+
+void LibreLinkUpClient::pollAsyncRequest() {
+    if (!_asyncClient) {
+        return;
+    }
+
+    esp_err_t err = esp_http_client_perform(_asyncClient);
+    if (err == ESP_ERR_HTTP_EAGAIN) {
+        return;
+    }
+    if (err != ESP_OK) {
+        failAsync("ESP32 async HTTP failed: " + String(esp_err_to_name(err)));
+        return;
+    }
+
+    finishAsyncResponse();
+}
+
+bool LibreLinkUpClient::finishAsyncResponse() {
+    int status = esp_http_client_get_status_code(_asyncClient);
+    esp_http_client_cleanup(_asyncClient);
+    _asyncClient = nullptr;
+
+    if (status < 200 || status >= 300) {
+        failAsync("HTTP " + String(status) + ": " + _asyncResponse);
+        return false;
+    }
+
+    switch (_asyncPhase) {
+        case AsyncPhase::Login:
+            return handleAsyncLogin();
+        case AsyncPhase::Connections:
+            return handleAsyncConnections();
+        case AsyncPhase::Graph:
+            return handleAsyncGraph();
+        default:
+            failAsync("unexpected ESP32 async phase");
+            return false;
+    }
+}
+
+bool LibreLinkUpClient::handleAsyncLogin() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, _asyncResponse);
+    if (err) {
+        failAsync(String("login JSON parse failed: ") + err.c_str());
+        return false;
+    }
+
+    if (doc["data"]["redirect"].as<bool>()) {
+        failAsync(String("login redirected to region: ")
+            + doc["data"]["region"].as<const char*>());
+        return false;
+    }
+
+    const char* token = doc["data"]["authTicket"]["token"] | nullptr;
+    const char* userId = doc["data"]["user"]["id"] | nullptr;
+    if (!token || !userId) {
+        failAsync("login response missing authTicket token or user id");
+        return false;
+    }
+
+    _authToken = token;
+    _accountId = sha256Hex(String(userId));
+    return startAsyncRequest("GET", "/llu/connections", "", AsyncPhase::Connections);
+}
+
+bool LibreLinkUpClient::handleAsyncConnections() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, _asyncResponse);
+    if (err) {
+        failAsync(String("connections JSON parse failed: ") + err.c_str());
+        return false;
+    }
+
+    JsonArray connections = doc["data"].as<JsonArray>();
+    if (connections.isNull() || _connectionIndex >= connections.size()) {
+        failAsync("no LibreLinkUp connection at index " + String(_connectionIndex));
+        return false;
+    }
+
+    JsonVariant connection = connections[_connectionIndex];
+    _asyncPatientId = connection["patientId"].as<String>();
+    String firstName = connection["firstName"].as<String>();
+    String lastName = connection["lastName"].as<String>();
+    _asyncPatientName = firstName + (lastName.length() ? " " + lastName : "");
+
+    if (_asyncPatientId.length() == 0) {
+        failAsync("connection missing patientId");
+        return false;
+    }
+
+    return startAsyncRequest(
+        "GET",
+        "/llu/connections/" + _asyncPatientId + "/graph",
+        "",
+        AsyncPhase::Graph
+    );
+}
+
+bool LibreLinkUpClient::handleAsyncGraph() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, _asyncResponse);
+    if (err) {
+        failAsync(String("graph JSON parse failed: ") + err.c_str());
+        return false;
+    }
+
+    JsonVariant raw = doc["data"]["connection"]["glucoseMeasurement"];
+    if (raw.isNull()) {
+        failAsync("graph response missing glucoseMeasurement");
+        return false;
+    }
+
+    _reading.patientName = _asyncPatientName;
+    _reading.timestamp = raw["Timestamp"].as<String>();
+    _reading.valueMgDl = raw["ValueInMgPerDl"] | 0;
+    _reading.value = raw["Value"] | 0.0;
+    _reading.trendArrow = raw["TrendArrow"] | 0;
+    _reading.measurementColor = raw["MeasurementColor"] | 0;
+    _reading.trend = libreLinkUpTrendArrowFromInt(_reading.trendArrow);
+    _reading.color = libreLinkUpMeasurementColorFromInt(_reading.measurementColor);
+    _hasReading = true;
+    _lastUpdatedAt = millis();
+    _asyncPhase = AsyncPhase::Idle;
+    _updating = false;
+
+    if (_updateCallback) {
+        _updateCallback(_reading);
+    }
+    return true;
+}
+
+void LibreLinkUpClient::failAsync(const String& error) {
+    _lastError = error;
+    _asyncPhase = AsyncPhase::Idle;
+    _updating = false;
+    if (_asyncClient) {
+        esp_http_client_cleanup(_asyncClient);
+        _asyncClient = nullptr;
+    }
+    if (_errorCallback) {
+        _errorCallback(_lastError);
+    }
+}
+
+esp_err_t LibreLinkUpClient::handleAsyncEvent(esp_http_client_event_t* event) {
+    LibreLinkUpClient* self = static_cast<LibreLinkUpClient*>(event->user_data);
+    if (!self) {
+        return ESP_OK;
+    }
+
+    if (event->event_id == HTTP_EVENT_ON_DATA && event->data && event->data_len > 0) {
+        const char* data = static_cast<const char*>(event->data);
+        for (int i = 0; i < event->data_len; i++) {
+            self->_asyncResponse += data[i];
+        }
+    }
+    return ESP_OK;
+}
+#endif
 
 bool LibreLinkUpClient::login() {
     JsonDocument body;

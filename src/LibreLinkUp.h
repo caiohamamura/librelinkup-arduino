@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#if defined(ESP32)
+#include <esp_http_client.h>
+#endif
 
 enum class LibreLinkUpTrendArrow : uint8_t {
     Unknown = 0,
@@ -77,6 +80,15 @@ public:
     const String& accountId() const;
 
 private:
+#if defined(ESP32)
+    enum class AsyncPhase : uint8_t {
+        Idle,
+        Login,
+        Connections,
+        Graph,
+    };
+#endif
+
     String _email;
     String _password;
     String _baseUrl;
@@ -92,9 +104,28 @@ private:
     unsigned long _lastUpdatedAt = 0;
     LibreLinkUpUpdateCallback _updateCallback = nullptr;
     LibreLinkUpErrorCallback _errorCallback = nullptr;
+#if defined(ESP32)
+    esp_http_client_handle_t _asyncClient = nullptr;
+    AsyncPhase _asyncPhase = AsyncPhase::Idle;
+    String _asyncResponse;
+    String _asyncBody;
+    String _asyncPatientId;
+    String _asyncPatientName;
+#endif
 
     bool request(const String& method, const String& path, const String& body, String& response);
     bool getConnection(uint8_t index, String& patientId, String& patientName);
     void setCommonHeaders(void* httpClient);
     String sha256Hex(const String& input);
+#if defined(ESP32)
+    bool startAsyncRefresh();
+    bool startAsyncRequest(const String& method, const String& path, const String& body, AsyncPhase phase);
+    void pollAsyncRequest();
+    bool finishAsyncResponse();
+    bool handleAsyncLogin();
+    bool handleAsyncConnections();
+    bool handleAsyncGraph();
+    void failAsync(const String& error);
+    static esp_err_t handleAsyncEvent(esp_http_client_event_t* event);
+#endif
 };

@@ -124,9 +124,9 @@ Complete examples:
 - `updateNow()` forces a refresh immediately.
 - `patientName()`, `timestamp()`, `valueMgDl()`, `trendName()`, and
   `colorName()` read from the latest cached value.
-- The public API is loop/callback based. The HTTPS refresh still uses the
-  built-in secure HTTP clients internally because portable async HTTPS is not
-  reliable across both ESP32 and ESP8266.
+- ESP32 uses the bundled ESP-IDF `esp_http_client` in async mode internally.
+- ESP8266 uses the same public loop/cache API with synchronous BearSSL HTTPS
+  fallback, because portable async outbound HTTPS is not available there.
 - Default base URL: `https://api.libreview.io`
 - Default client version: `4.16.0`
 - The client logs in with `POST /llu/auth/login`
