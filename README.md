@@ -1,78 +1,20 @@
-# Libre-linkup-py
+# LibreLinkUp Arduino
 
-## TL;DR
+Arduino/PlatformIO client for reading the latest LibreLinkUp glucose value on
+ESP32 and ESP8266.
 
-Unofficial client to get your glucose readings from the LibreLinkUp API in Python.
-Supports Python 3.9 and above
+This is an unofficial client for the LibreView/LibreLinkUp API. The API can
+change without notice.
 
-## Contents
+## Supported Boards
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Examples](#examples)
-- [Contributing](#contributing)
+- ESP32 Arduino core
+- ESP8266 Arduino core
 
-## Installation
+## PlatformIO Usage
 
-    pip install libre-linkup-py
-
-## Usage
-
-Note: I recommend using something like [python-dotenv](https://pypi.org/project/python-dotenv/) to manage your environment variables.
-
-1. Create a .env file with the following contents:
-
-```bash
-LIBRE_LINK_UP_USERNAME=...
-LIBRE_LINK_UP_PASSWORD=...
-LIBRE_LINK_UP_URL=https://api-eu2.libreview.io
-LIBRE_LINK_UP_VERSION=4.16.0  # Optional
-```
-
-The url for `LIBRE_LINK_UP_URL` may be different depending on where you live, current [options](src/libre_link_up/types.py), also see [here](https://gist.github.com/khskekec/6c13ba01b10d3018d816706a32ae8ab2) for more information.
-
-2. Paste this code into a file and run it:
-```python
-from libre_link_up import LibreLinkUpClient
-import os
-import dotenv
-import json
-
-dotenv.load_dotenv()
-
-client = LibreLinkUpClient(
-    username=os.environ["LIBRE_LINK_UP_USERNAME"],
-    password=os.environ["LIBRE_LINK_UP_PASSWORD"],
-    url=os.environ["LIBRE_LINK_UP_URL"],
-    version="4.16.0",
-)
-client.login()
-glucose_data = client.get_latest_reading()
-print(json.dumps(glucose_data.model_dump(), sort_keys=True, indent=4))
-```
-
-The output should look something like:
-```json
-{
-    "high_at_the_time": false,
-    "low_at_the_time": false,
-    "unix_timestamp": 1709830900.0,
-    "value": 7.9,
-    "value_in_mg_per_dl": 143.0
-}
-```
-
-## Examples
-
-See the [examples](examples/) directory for more examples.
-
-## Arduino / PlatformIO
-
-This repository also includes an Arduino library for ESP32 and ESP8266.
-
-### PlatformIO usage
-
-If this repository is next to your PlatformIO project:
+If this repository is next to your PlatformIO project, reference it with
+`lib_extra_dirs`:
 
 ```ini
 [env:esp32dev]
@@ -82,13 +24,23 @@ framework = arduino
 monitor_speed = 115200
 lib_deps =
     bblanchon/ArduinoJson @ ^7.0.0
-lib_extra_dirs = ../librelink
+lib_extra_dirs = ../librelinkup-arduino
 ```
 
-For ESP8266, use `platform = espressif8266` and an ESP8266 board such as
-`nodemcuv2`.
+For ESP8266:
 
-### Arduino example
+```ini
+[env:nodemcuv2]
+platform = espressif8266
+board = nodemcuv2
+framework = arduino
+monitor_speed = 115200
+lib_deps =
+    bblanchon/ArduinoJson @ ^7.0.0
+lib_extra_dirs = ../librelinkup-arduino
+```
+
+## Basic Example
 
 ```cpp
 #include <LibreLinkUp.h>
@@ -101,6 +53,10 @@ LibreLinkUpClient libre(
 
 LibreLinkUpReading reading;
 if (libre.getLatestReading(reading)) {
+    Serial.print("Patient: ");
+    Serial.println(reading.patientName);
+    Serial.print("Timestamp: ");
+    Serial.println(reading.timestamp);
     Serial.print("Glucose: ");
     Serial.print(reading.valueMgDl);
     Serial.println(" mg/dL");
@@ -109,15 +65,36 @@ if (libre.getLatestReading(reading)) {
 }
 ```
 
-Complete ESP32 and ESP8266 examples are in:
+Complete examples:
 
 - `examples/esp32_latest_reading`
 - `examples/esp8266_latest_reading`
 
-The Arduino client requests `Accept-Encoding: identity`; do not switch this to
-`gzip` unless you add explicit decompression before JSON parsing.
+## API Notes
 
-## Contributing
+- Default base URL: `https://api.libreview.io`
+- Default client version: `4.16.0`
+- The client logs in with `POST /llu/auth/login`
+- The latest reading is read from `GET /llu/connections/{patientId}/graph`
+- `Account-Id` is generated as SHA-256 of the returned user id
+- The client requests `Accept-Encoding: identity`; do not switch this to `gzip`
+  unless you add explicit decompression before JSON parsing.
 
-If you find a bug :bug:, please open a [bug report](https://github.com/smpurkis/libre-linkup-py/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
-If you have an idea for an improvement or new feature :rocket:, please open a [feature request](https://github.com/smpurkis/libre-linkup-py/issues/new?assignees=&labels=Feature+request&template=feature_request.md&title=).
+## TLS Note
+
+The current implementation uses `setInsecure()` for simple ESP32/ESP8266
+prototyping. For production use, add proper LibreView root CA validation and
+ensure the device clock is valid before making HTTPS requests.
+
+## Build Checks
+
+From each example directory:
+
+```bash
+pio run
+```
+
+Verified locally:
+
+- `examples/esp32_latest_reading`
+- `examples/esp8266_latest_reading`
