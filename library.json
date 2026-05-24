@@ -1,17 +1,19 @@
 {
   "name": "LibreLinkUp",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "description": "Arduino/PlatformIO client for reading the latest LibreLinkUp glucose value on ESP8266 and ESP32.",
   "keywords": [
     "librelinkup",
     "libre",
     "librelink",
-    "freestylelibre",
+    "freestyle",
     "abbott",
     "libreview",
     "glucose",
     "esp8266",
-    "esp32"
+    "esp32",
+    "caio",
+    "hamamura"
   ],
   "authors": [
     {

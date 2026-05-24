@@ -1,0 +1,10 @@
+// test_config.h
+#pragma once
+
+#define TEST_WIFI_SSID "your-wifi"
+#define TEST_WIFI_PASSWORD "your-wifi-password"
+
+#define TEST_LIBRE_EMAIL "your@email.com"
+#define TEST_LIBRE_PASSWORD "your-password"
+#define TEST_LIBRE_BASE_URL "https://api.libreview.io"
+// or "https://api-eu2.libreview.io"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #if defined(ESP32)
 #include <esp_http_client.h>
 #endif
@@ -41,6 +42,7 @@ LibreLinkUpMeasurementColor libreLinkUpMeasurementColorFromInt(int value);
 const char* libreLinkUpTrendArrowName(LibreLinkUpTrendArrow trend);
 const char* libreLinkUpTrendArrowSymbol(LibreLinkUpTrendArrow trend);
 const char* libreLinkUpMeasurementColorName(LibreLinkUpMeasurementColor color);
+String userIdFromAuthToken(const String& token);
 
 class LibreLinkUpClient {
 public:
@@ -117,6 +119,14 @@ private:
     bool getConnection(uint8_t index, String& patientId, String& patientName);
     void setCommonHeaders(void* httpClient);
     String sha256Hex(const String& input);
+    bool getGraphJson(JsonDocument& doc, const String& patientId);
+    bool requestJson(
+        const String& method,
+        const String& path,
+        const String& body,
+        JsonDocument& doc,
+        JsonDocument* filter = nullptr
+    );
 #if defined(ESP32)
     bool startAsyncRefresh();
     bool startAsyncRequest(const String& method, const String& path, const String& body, AsyncPhase phase);

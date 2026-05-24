@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #if defined(ESP32)
-#include <WiFi.h>
+    #include <WiFi.h>
 #elif defined(ESP8266)
-#include <ESP8266WiFi.h>
+    #include <ESP8266WiFi.h>
 #endif
 #include <LibreLinkUp.h>
 
@@ -41,13 +41,12 @@ void setup() {
     delay(1000);
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("Connecting to WiFi");
+    Serial.print("\nConnecting to WiFi");
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
-    Serial.println();
-    Serial.println("WiFi connected");
+    Serial.println("\nWiFi connected");
 
     libre.onUpdate(printReading);
     libre.onError(printError);
@@ -56,10 +55,4 @@ void setup() {
 
 void loop() {
     libre.loop();
-
-    if (libre.hasReading()) {
-        Serial.print("Cached patient: ");
-        Serial.println(libre.patientName());
-        delay(5000);
-    }
 }

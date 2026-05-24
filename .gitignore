@@ -3,3 +3,4 @@
 .DS_Store
 build/
 dist/
+test_config.h
