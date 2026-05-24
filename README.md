@@ -22,7 +22,7 @@ board = esp32dev
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    caiohamamura/LibreLinkUp @ ^0.2.0
+    caiohamamura/LibreLinkUp @ ^0.2.2
 ```
 
 For ESP8266:
@@ -34,7 +34,7 @@ board = nodemcuv2
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    caiohamamura/LibreLinkUp @ ^0.2.0
+    caiohamamura/LibreLinkUp @ ^0.2.2
 ```
 
 `ArduinoJson` is declared as a library dependency and is installed
@@ -114,8 +114,14 @@ Measurement color enum mapping:
 
 Complete examples:
 
-- `examples/esp32_latest_reading`
-- `examples/esp8266_latest_reading`
+- `examples/latest_reading`
+
+The example uses one `platformio.ini` with multiple board environments:
+
+```bash
+pio run -e esp32dev
+pio run -e nodemcuv2
+```
 
 ## API Notes
 
@@ -143,13 +149,14 @@ ensure the device clock is valid before making HTTPS requests.
 
 ## Build Checks
 
-From each example directory:
+From `examples/latest_reading`:
 
 ```bash
-pio run
+pio run -e esp32dev
+pio run -e nodemcuv2
 ```
 
 Verified locally:
 
-- `examples/esp32_latest_reading`
-- `examples/esp8266_latest_reading`
+- `examples/latest_reading` with `esp32dev`
+- `examples/latest_reading` with `nodemcuv2`

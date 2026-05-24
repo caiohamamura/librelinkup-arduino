@@ -1,6 +1,6 @@
 {
   "name": "LibreLinkUp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Arduino/PlatformIO client for reading the latest LibreLinkUp glucose value on ESP8266 and ESP32.",
   "keywords": [
     "librelinkup",
@@ -32,7 +32,6 @@
     }
   ],
   "examples": [
-    "examples/esp32_latest_reading",
-    "examples/esp8266_latest_reading"
+    "examples/latest_reading"
   ]
 }
