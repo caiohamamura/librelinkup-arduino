@@ -13,8 +13,7 @@ change without notice.
 
 ## PlatformIO Usage
 
-If this repository is next to your PlatformIO project, reference it with
-`lib_extra_dirs`:
+Install from the PlatformIO Registry:
 
 ```ini
 [env:esp32dev]
@@ -23,8 +22,7 @@ board = esp32dev
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    bblanchon/ArduinoJson @ ^7.0.0
-lib_extra_dirs = ../librelinkup-arduino
+    caiohamamura/LibreLinkUp @ ^0.1.0
 ```
 
 For ESP8266:
@@ -36,9 +34,11 @@ board = nodemcuv2
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    bblanchon/ArduinoJson @ ^7.0.0
-lib_extra_dirs = ../librelinkup-arduino
+    caiohamamura/LibreLinkUp @ ^0.1.0
 ```
+
+`ArduinoJson` is declared as a library dependency and is installed
+automatically by PlatformIO.
 
 ## Basic Example
 
