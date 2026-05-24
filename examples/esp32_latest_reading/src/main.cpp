@@ -10,6 +10,28 @@ const char* LIBRE_PASSWORD = "YOUR_LIBRE_LINK_UP_PASSWORD";
 
 LibreLinkUpClient libre(LIBRE_EMAIL, LIBRE_PASSWORD);
 
+void printReading(const LibreLinkUpReading& reading) {
+    Serial.print("Patient: ");
+    Serial.println(reading.patientName);
+    Serial.print("Timestamp: ");
+    Serial.println(reading.timestamp);
+    Serial.print("Glucose: ");
+    Serial.print(reading.valueMgDl);
+    Serial.println(" mg/dL");
+    Serial.print("Trend: ");
+    Serial.print(libreLinkUpTrendArrowName(reading.trend));
+    Serial.print(" (");
+    Serial.print(libreLinkUpTrendArrowSymbol(reading.trend));
+    Serial.println(")");
+    Serial.print("Range: ");
+    Serial.println(libreLinkUpMeasurementColorName(reading.color));
+}
+
+void printError(const String& error) {
+    Serial.print("LibreLinkUp error: ");
+    Serial.println(error);
+}
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -23,30 +45,17 @@ void setup() {
     Serial.println();
     Serial.println("WiFi connected");
 
-    LibreLinkUpReading reading;
-    if (!libre.getLatestReading(reading)) {
-        Serial.print("LibreLinkUp error: ");
-        Serial.println(libre.lastError());
-        return;
-    }
-
-    Serial.print("Patient: ");
-    Serial.println(reading.patientName);
-    Serial.print("Timestamp: ");
-    Serial.println(reading.timestamp);
-    Serial.print("Glucose: ");
-    Serial.print(reading.valueMgDl);
-    Serial.println(" mg/dL");
-    Serial.print("Trend arrow: ");
-    Serial.println(reading.trendArrow);
-    Serial.print("Trend: ");
-    Serial.print(libreLinkUpTrendArrowName(reading.trend));
-    Serial.print(" (");
-    Serial.print(libreLinkUpTrendArrowSymbol(reading.trend));
-    Serial.println(")");
-    Serial.print("Range: ");
-    Serial.println(libreLinkUpMeasurementColorName(reading.color));
+    libre.onUpdate(printReading);
+    libre.onError(printError);
+    libre.setup();
 }
 
 void loop() {
+    libre.loop();
+
+    if (libre.hasReading()) {
+        Serial.print("Cached patient: ");
+        Serial.println(libre.patientName());
+        delay(5000);
+    }
 }

@@ -22,7 +22,7 @@ board = esp32dev
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    caiohamamura/LibreLinkUp @ ^0.1.0
+    caiohamamura/LibreLinkUp @ ^0.2.0
 ```
 
 For ESP8266:
@@ -34,13 +34,13 @@ board = nodemcuv2
 framework = arduino
 monitor_speed = 115200
 lib_deps =
-    caiohamamura/LibreLinkUp @ ^0.1.0
+    caiohamamura/LibreLinkUp @ ^0.2.0
 ```
 
 `ArduinoJson` is declared as a library dependency and is installed
 automatically by PlatformIO.
 
-## Basic Example
+## Basic Cached Loop Example
 
 ```cpp
 #include <LibreLinkUp.h>
@@ -51,21 +51,42 @@ LibreLinkUpClient libre(
     "https://api.libreview.io"
 );
 
-LibreLinkUpReading reading;
-if (libre.getLatestReading(reading)) {
+void onReading(const LibreLinkUpReading& reading) {
     Serial.print("Patient: ");
     Serial.println(reading.patientName);
-    Serial.print("Timestamp: ");
-    Serial.println(reading.timestamp);
     Serial.print("Glucose: ");
     Serial.print(reading.valueMgDl);
     Serial.println(" mg/dL");
-    Serial.print("Trend: ");
-    Serial.println(libreLinkUpTrendArrowName(reading.trend));
-    Serial.print("Range: ");
-    Serial.println(libreLinkUpMeasurementColorName(reading.color));
-} else {
-    Serial.println(libre.lastError());
+}
+
+void onError(const String& error) {
+    Serial.println(error);
+}
+
+void setup() {
+    Serial.begin(115200);
+    // Connect WiFi before calling libre.loop().
+    libre.onUpdate(onReading);
+    libre.onError(onError);
+    libre.setup(); // default: connection 0, cache for 60 seconds
+}
+
+void loop() {
+    libre.loop(); // refreshes only when cache is older than 1 minute
+
+    if (libre.hasReading()) {
+        Serial.println(libre.patientName());
+        Serial.println(libre.valueMgDl());
+    }
+}
+```
+
+The low-level synchronous call is still available when you need full control:
+
+```cpp
+LibreLinkUpReading reading;
+if (libre.getLatestReading(reading)) {
+    Serial.println(reading.valueMgDl);
 }
 ```
 
@@ -98,6 +119,14 @@ Complete examples:
 
 ## API Notes
 
+- `setup()` configures the cached loop API.
+- `loop()` reuses the cached reading until the cache is older than 60 seconds.
+- `updateNow()` forces a refresh immediately.
+- `patientName()`, `timestamp()`, `valueMgDl()`, `trendName()`, and
+  `colorName()` read from the latest cached value.
+- The public API is loop/callback based. The HTTPS refresh still uses the
+  built-in secure HTTP clients internally because portable async HTTPS is not
+  reliable across both ESP32 and ESP8266.
 - Default base URL: `https://api.libreview.io`
 - Default client version: `4.16.0`
 - The client logs in with `POST /llu/auth/login`

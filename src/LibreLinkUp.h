@@ -30,6 +30,9 @@ struct LibreLinkUpReading {
     LibreLinkUpMeasurementColor color = LibreLinkUpMeasurementColor::Unknown;
 };
 
+typedef void (*LibreLinkUpUpdateCallback)(const LibreLinkUpReading& reading);
+typedef void (*LibreLinkUpErrorCallback)(const String& error);
+
 LibreLinkUpTrendArrow libreLinkUpTrendArrowFromInt(int value);
 LibreLinkUpMeasurementColor libreLinkUpMeasurementColorFromInt(int value);
 const char* libreLinkUpTrendArrowName(LibreLinkUpTrendArrow trend);
@@ -45,8 +48,29 @@ public:
         const String& version = "4.16.0"
     );
 
+    void setup(uint8_t connectionIndex = 0, unsigned long cacheDurationMs = 60000);
+    void loop();
+    bool updateNow();
+
+    void onUpdate(LibreLinkUpUpdateCallback callback);
+    void onError(LibreLinkUpErrorCallback callback);
+
     bool login();
     bool getLatestReading(LibreLinkUpReading& reading, uint8_t connectionIndex = 0);
+
+    bool hasReading() const;
+    bool isUpdating() const;
+    unsigned long lastUpdatedAt() const;
+    const LibreLinkUpReading& reading() const;
+    const String& patientName() const;
+    const String& timestamp() const;
+    int valueMgDl() const;
+    float value() const;
+    LibreLinkUpTrendArrow trend() const;
+    LibreLinkUpMeasurementColor color() const;
+    const char* trendName() const;
+    const char* trendSymbol() const;
+    const char* colorName() const;
 
     const String& lastError() const;
     const String& authToken() const;
@@ -60,6 +84,14 @@ private:
     String _authToken;
     String _accountId;
     String _lastError;
+    LibreLinkUpReading _reading;
+    bool _hasReading = false;
+    bool _updating = false;
+    uint8_t _connectionIndex = 0;
+    unsigned long _cacheDurationMs = 60000;
+    unsigned long _lastUpdatedAt = 0;
+    LibreLinkUpUpdateCallback _updateCallback = nullptr;
+    LibreLinkUpErrorCallback _errorCallback = nullptr;
 
     bool request(const String& method, const String& path, const String& body, String& response);
     bool getConnection(uint8_t index, String& patientId, String& patientName);

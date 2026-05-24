@@ -209,6 +209,63 @@ LibreLinkUpClient::LibreLinkUpClient(
     }
 }
 
+void LibreLinkUpClient::setup(uint8_t connectionIndex, unsigned long cacheDurationMs) {
+    _connectionIndex = connectionIndex;
+    _cacheDurationMs = cacheDurationMs;
+    _lastUpdatedAt = 0;
+    _hasReading = false;
+    _updating = false;
+}
+
+void LibreLinkUpClient::loop() {
+    if (_updating) {
+        return;
+    }
+
+    unsigned long now = millis();
+    bool cacheExpired = !_hasReading || (now - _lastUpdatedAt >= _cacheDurationMs);
+    if (!cacheExpired) {
+        return;
+    }
+
+    updateNow();
+}
+
+bool LibreLinkUpClient::updateNow() {
+    if (_updating) {
+        return false;
+    }
+
+    _updating = true;
+    LibreLinkUpReading latest;
+    bool ok = getLatestReading(latest, _connectionIndex);
+    _updating = false;
+
+    if (!ok) {
+        if (_errorCallback) {
+            _errorCallback(_lastError);
+        }
+        return false;
+    }
+
+    _reading = latest;
+    _hasReading = true;
+    _lastUpdatedAt = millis();
+
+    if (_updateCallback) {
+        _updateCallback(_reading);
+    }
+    return true;
+}
+
+void LibreLinkUpClient::onUpdate(LibreLinkUpUpdateCallback callback) {
+    _updateCallback = callback;
+}
+
+void LibreLinkUpClient::onError(LibreLinkUpErrorCallback callback) {
+    _errorCallback = callback;
+}
+
 bool LibreLinkUpClient::login() {
     JsonDocument body;
     body["email"] = _email;
@@ -285,6 +342,58 @@ bool LibreLinkUpClient::getLatestReading(LibreLinkUpReading& reading, uint8_t co
     reading.trend = libreLinkUpTrendArrowFromInt(reading.trendArrow);
     reading.color = libreLinkUpMeasurementColorFromInt(reading.measurementColor);
     return true;
+}
+
+bool LibreLinkUpClient::hasReading() const {
+    return _hasReading;
+}
+
+bool LibreLinkUpClient::isUpdating() const {
+    return _updating;
+}
+
+unsigned long LibreLinkUpClient::lastUpdatedAt() const {
+    return _lastUpdatedAt;
+}
+
+const LibreLinkUpReading& LibreLinkUpClient::reading() const {
+    return _reading;
+}
+
+const String& LibreLinkUpClient::patientName() const {
+    return _reading.patientName;
+}
+
+const String& LibreLinkUpClient::timestamp() const {
+    return _reading.timestamp;
+}
+
+int LibreLinkUpClient::valueMgDl() const {
+    return _reading.valueMgDl;
+}
+
+float LibreLinkUpClient::value() const {
+    return _reading.value;
+}
+
+LibreLinkUpTrendArrow LibreLinkUpClient::trend() const {
+    return _reading.trend;
+}
+
+LibreLinkUpMeasurementColor LibreLinkUpClient::color() const {
+    return _reading.color;
+}
+
+const char* LibreLinkUpClient::trendName() const {
+    return libreLinkUpTrendArrowName(_reading.trend);
+}
+
+const char* LibreLinkUpClient::trendSymbol() const {
+    return libreLinkUpTrendArrowSymbol(_reading.trend);
+}
+
+const char* LibreLinkUpClient::colorName() const {
+    return libreLinkUpMeasurementColorName(_reading.color);
 }
 
 const String& LibreLinkUpClient::lastError() const {
