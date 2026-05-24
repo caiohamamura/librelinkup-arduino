@@ -114,6 +114,9 @@ Complete ESP32 and ESP8266 examples are in:
 - `examples/esp32_latest_reading`
 - `examples/esp8266_latest_reading`
 
+The Arduino client requests `Accept-Encoding: identity`; do not switch this to
+`gzip` unless you add explicit decompression before JSON parsing.
+
 ## Contributing
 
 If you find a bug :bug:, please open a [bug report](https://github.com/smpurkis/libre-linkup-py/issues/new?assignees=&labels=bug&template=bug_report.md&title=).

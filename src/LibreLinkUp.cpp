@@ -240,7 +240,8 @@ bool LibreLinkUpClient::request(
 
     http.addHeader("product", "llu.android");
     http.addHeader("version", _version);
-    http.addHeader("Accept-Encoding", "gzip");
+    // Arduino HTTP stacks do not transparently decompress gzip.
+    http.addHeader("Accept-Encoding", "identity");
     http.addHeader("Cache-Control", "no-cache");
     http.addHeader("Connection", "Keep-Alive");
     http.addHeader("Content-Type", "application/json");
