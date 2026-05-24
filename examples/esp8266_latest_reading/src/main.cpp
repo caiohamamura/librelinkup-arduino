@@ -39,6 +39,13 @@ void setup() {
     Serial.println(" mg/dL");
     Serial.print("Trend arrow: ");
     Serial.println(reading.trendArrow);
+    Serial.print("Trend: ");
+    Serial.print(libreLinkUpTrendArrowName(reading.trend));
+    Serial.print(" (");
+    Serial.print(libreLinkUpTrendArrowSymbol(reading.trend));
+    Serial.println(")");
+    Serial.print("Range: ");
+    Serial.println(libreLinkUpMeasurementColorName(reading.color));
 }
 
 void loop() {

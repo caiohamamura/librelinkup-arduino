@@ -60,10 +60,36 @@ if (libre.getLatestReading(reading)) {
     Serial.print("Glucose: ");
     Serial.print(reading.valueMgDl);
     Serial.println(" mg/dL");
+    Serial.print("Trend: ");
+    Serial.println(libreLinkUpTrendArrowName(reading.trend));
+    Serial.print("Range: ");
+    Serial.println(libreLinkUpMeasurementColorName(reading.color));
 } else {
     Serial.println(libre.lastError());
 }
 ```
+
+`LibreLinkUpReading` keeps the raw API values in `trendArrow` and
+`measurementColor`, and also exposes semantic enums in `trend` and `color`.
+
+Trend enum mapping:
+
+| Raw | Enum | Name |
+|---:|---|---|
+| 1 | `LibreLinkUpTrendArrow::DownFast` | `down_fast` |
+| 2 | `LibreLinkUpTrendArrow::DownSlow` | `down_slow` |
+| 3 | `LibreLinkUpTrendArrow::Stable` | `stable` |
+| 4 | `LibreLinkUpTrendArrow::UpSlow` | `up_slow` |
+| 5 | `LibreLinkUpTrendArrow::UpFast` | `up_fast` |
+
+Measurement color enum mapping:
+
+| Raw | Enum | Name |
+|---:|---|---|
+| 1 | `LibreLinkUpMeasurementColor::InTarget` | `in_target` |
+| 2 | `LibreLinkUpMeasurementColor::High` | `high` |
+| 3 | `LibreLinkUpMeasurementColor::VeryHigh` | `very_high` |
+| 4 | `LibreLinkUpMeasurementColor::Low` | `low` |
 
 Complete examples:
 

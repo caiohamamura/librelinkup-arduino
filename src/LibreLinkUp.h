@@ -2,6 +2,23 @@
 
 #include <Arduino.h>
 
+enum class LibreLinkUpTrendArrow : uint8_t {
+    Unknown = 0,
+    DownFast = 1,
+    DownSlow = 2,
+    Stable = 3,
+    UpSlow = 4,
+    UpFast = 5,
+};
+
+enum class LibreLinkUpMeasurementColor : uint8_t {
+    Unknown = 0,
+    InTarget = 1,
+    High = 2,
+    VeryHigh = 3,
+    Low = 4,
+};
+
 struct LibreLinkUpReading {
     String patientName;
     String timestamp;
@@ -9,7 +26,15 @@ struct LibreLinkUpReading {
     float value = 0;
     int trendArrow = 0;
     int measurementColor = 0;
+    LibreLinkUpTrendArrow trend = LibreLinkUpTrendArrow::Unknown;
+    LibreLinkUpMeasurementColor color = LibreLinkUpMeasurementColor::Unknown;
 };
+
+LibreLinkUpTrendArrow libreLinkUpTrendArrowFromInt(int value);
+LibreLinkUpMeasurementColor libreLinkUpMeasurementColorFromInt(int value);
+const char* libreLinkUpTrendArrowName(LibreLinkUpTrendArrow trend);
+const char* libreLinkUpTrendArrowSymbol(LibreLinkUpTrendArrow trend);
+const char* libreLinkUpMeasurementColorName(LibreLinkUpMeasurementColor color);
 
 class LibreLinkUpClient {
 public:

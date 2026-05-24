@@ -114,6 +114,87 @@ String sha256HexBytes(const uint8_t* data, size_t len) {
 
 } // namespace
 
+LibreLinkUpTrendArrow libreLinkUpTrendArrowFromInt(int value) {
+    switch (value) {
+        case 1:
+            return LibreLinkUpTrendArrow::DownFast;
+        case 2:
+            return LibreLinkUpTrendArrow::DownSlow;
+        case 3:
+            return LibreLinkUpTrendArrow::Stable;
+        case 4:
+            return LibreLinkUpTrendArrow::UpSlow;
+        case 5:
+            return LibreLinkUpTrendArrow::UpFast;
+        default:
+            return LibreLinkUpTrendArrow::Unknown;
+    }
+}
+
+LibreLinkUpMeasurementColor libreLinkUpMeasurementColorFromInt(int value) {
+    switch (value) {
+        case 1:
+            return LibreLinkUpMeasurementColor::InTarget;
+        case 2:
+            return LibreLinkUpMeasurementColor::High;
+        case 3:
+            return LibreLinkUpMeasurementColor::VeryHigh;
+        case 4:
+            return LibreLinkUpMeasurementColor::Low;
+        default:
+            return LibreLinkUpMeasurementColor::Unknown;
+    }
+}
+
+const char* libreLinkUpTrendArrowName(LibreLinkUpTrendArrow trend) {
+    switch (trend) {
+        case LibreLinkUpTrendArrow::DownFast:
+            return "down_fast";
+        case LibreLinkUpTrendArrow::DownSlow:
+            return "down_slow";
+        case LibreLinkUpTrendArrow::Stable:
+            return "stable";
+        case LibreLinkUpTrendArrow::UpSlow:
+            return "up_slow";
+        case LibreLinkUpTrendArrow::UpFast:
+            return "up_fast";
+        default:
+            return "unknown";
+    }
+}
+
+const char* libreLinkUpTrendArrowSymbol(LibreLinkUpTrendArrow trend) {
+    switch (trend) {
+        case LibreLinkUpTrendArrow::DownFast:
+            return "vv";
+        case LibreLinkUpTrendArrow::DownSlow:
+            return "v";
+        case LibreLinkUpTrendArrow::Stable:
+            return "->";
+        case LibreLinkUpTrendArrow::UpSlow:
+            return "^";
+        case LibreLinkUpTrendArrow::UpFast:
+            return "^^";
+        default:
+            return "?";
+    }
+}
+
+const char* libreLinkUpMeasurementColorName(LibreLinkUpMeasurementColor color) {
+    switch (color) {
+        case LibreLinkUpMeasurementColor::InTarget:
+            return "in_target";
+        case LibreLinkUpMeasurementColor::High:
+            return "high";
+        case LibreLinkUpMeasurementColor::VeryHigh:
+            return "very_high";
+        case LibreLinkUpMeasurementColor::Low:
+            return "low";
+        default:
+            return "unknown";
+    }
+}
+
 LibreLinkUpClient::LibreLinkUpClient(
     const String& email,
     const String& password,
@@ -201,6 +282,8 @@ bool LibreLinkUpClient::getLatestReading(LibreLinkUpReading& reading, uint8_t co
     reading.value = raw["Value"] | 0.0;
     reading.trendArrow = raw["TrendArrow"] | 0;
     reading.measurementColor = raw["MeasurementColor"] | 0;
+    reading.trend = libreLinkUpTrendArrowFromInt(reading.trendArrow);
+    reading.color = libreLinkUpMeasurementColorFromInt(reading.measurementColor);
     return true;
 }
 
