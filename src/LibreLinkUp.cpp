@@ -1,4 +1,5 @@
 #include "LibreLinkUp.h"
+
 #include <ArduinoJson.h>
 
 #if defined(ESP32)
@@ -36,24 +37,6 @@ const uint32_t SHA256_K[64] = {
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 };
-
-#if defined(ESP32)
-const char LIBRELINKUP_GTS_ROOT_R4[] PROGMEM = R"EOF(
------BEGIN CERTIFICATE-----
-MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
-VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
-A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
-WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
-IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
-AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
-QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
-HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
-BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
-9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
-p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
------END CERTIFICATE-----
-)EOF";
-#endif
 
 String sha256HexBytes(const uint8_t* data, size_t len) {
     uint64_t bitLen = static_cast<uint64_t>(len) * 8;
@@ -128,131 +111,6 @@ String sha256HexBytes(const uint8_t* data, size_t len) {
     }
     out[64] = '\0';
     return String(out);
-}
-
-int base64UrlValue(char c) {
-    if (c >= 'A' && c <= 'Z') {
-        return c - 'A';
-    }
-    if (c >= 'a' && c <= 'z') {
-        return c - 'a' + 26;
-    }
-    if (c >= '0' && c <= '9') {
-        return c - '0' + 52;
-    }
-    if (c == '-' || c == '+') {
-        return 62;
-    }
-    if (c == '_' || c == '/') {
-        return 63;
-    }
-    return -1;
-}
-
-bool decodeBase64Url(const String& input, String& output) {
-    output = "";
-    uint32_t buffer = 0;
-    int bits = 0;
-
-    for (size_t i = 0; i < input.length(); i++) {
-        char c = input[i];
-        if (c == '=') {
-            break;
-        }
-
-        int value = base64UrlValue(c);
-        if (value < 0) {
-            return false;
-        }
-
-        buffer = (buffer << 6) | static_cast<uint32_t>(value);
-        bits += 6;
-
-        while (bits >= 8) {
-            bits -= 8;
-            output += static_cast<char>((buffer >> bits) & 0xff);
-        }
-    }
-
-    return true;
-}
-
-String userIdFromAuthToken(const String& token) {
-    if (!token) {
-        return "";
-    }
-
-    String jwt = token;
-    int firstDot = jwt.indexOf('.');
-    int secondDot = firstDot < 0 ? -1 : jwt.indexOf('.', firstDot + 1);
-    if (firstDot < 0 || secondDot < 0 || secondDot <= firstDot + 1) {
-        return "";
-    }
-
-    String payload;
-    if (!decodeBase64Url(jwt.substring(firstDot + 1, secondDot), payload)) {
-        return "";
-    }
-
-    JsonDocument doc;
-    if (deserializeJson(doc, payload)) {
-        return "";
-    }
-
-    return doc["id"].as<String>();
-}
-
-bool parseLoginResponse(JsonDocument& doc, String& authToken, String& accountId, String& error) {
-    bool redirect = doc["data"]["redirect"] | false;
-    if (redirect) {
-        String region = doc["data"]["region"] | "";
-        error = "login redirected to region";
-        if (region.length() > 0) {
-            error += ": " + region;
-        }
-        return false;
-    }
-
-    int status = doc["status"] | 0;
-    if (status != 0) {
-        String stepType = doc["data"]["step"]["type"] | "";
-        String titleKey = doc["data"]["step"]["props"]["titleKey"] | "";
-
-        error = "login requires LibreLinkUp account action";
-        if (stepType.length() > 0) {
-            error += " (" + stepType + ")";
-        }
-        if (titleKey.length() > 0) {
-            error += ": " + titleKey;
-        }
-        error += "; open LibreLinkUp or LibreView and complete it";
-        return false;
-    }
-
-    String token = doc["data"]["authTicket"]["token"] | "";
-    String userId = doc["data"]["user"]["id"] | "";
-
-    if (userId.length() == 0 && token.length() > 0) {
-        userId = userIdFromAuthToken(token.c_str());
-    }
-
-    if (token.length() == 0 || userId.length() == 0) {
-        String debug;
-        serializeJson(doc, debug);
-        error = "login response missing authTicket token or user id"
-                "; token length=" + String(token.length()) +
-                "; userId length=" + String(userId.length()) +
-                "; parsed JSON=" + debug;
-        return false;
-    }
-
-    authToken = token;
-    accountId = sha256HexBytes(
-        reinterpret_cast<const uint8_t*>(userId.c_str()),
-        userId.length()
-    );
-
-    return true;
 }
 
 } // namespace
@@ -396,79 +254,6 @@ void LibreLinkUpClient::loop() {
 #endif
 }
 
-bool LibreLinkUpClient::getGraphJson(JsonDocument& doc, const String& patientId) {
-#if defined(ESP8266)
-    BearSSL::WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    HTTPClient http;
-#else
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    HTTPClient http;
-#endif
-
-    String url = _baseUrl + "/llu/connections/" + patientId + "/graph";
-
-    if (!http.begin(secureClient, url)) {
-        _lastError = "HTTP begin failed for " + url;
-        return false;
-    }
-
-    http.setTimeout(20000);
-    http.setReuse(false);
-
-    http.addHeader("product", "llu.android");
-    http.addHeader("version", _version);
-    http.addHeader("Accept-Encoding", "identity");
-    http.addHeader("Cache-Control", "no-cache");
-    http.addHeader("Connection", "close");
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader(
-        "User-Agent",
-        "Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36"
-    );
-
-    if (_authToken.length() > 0) {
-        http.addHeader("authorization", "Bearer " + _authToken);
-    }
-
-    if (_accountId.length() > 0) {
-        http.addHeader("Account-Id", _accountId);
-    }
-
-    int status = http.GET();
-
-    if (status < 200 || status >= 300) {
-        String body = http.getString();
-        _lastError = "HTTP " + String(status) + ": " + body;
-        http.end();
-        return false;
-    }
-
-    JsonDocument filter;
-    filter["data"]["connection"]["glucoseMeasurement"]["Timestamp"] = true;
-    filter["data"]["connection"]["glucoseMeasurement"]["ValueInMgPerDl"] = true;
-    filter["data"]["connection"]["glucoseMeasurement"]["Value"] = true;
-    filter["data"]["connection"]["glucoseMeasurement"]["TrendArrow"] = true;
-    filter["data"]["connection"]["glucoseMeasurement"]["MeasurementColor"] = true;
-
-    DeserializationError err = deserializeJson(
-        doc,
-        http.getStream(),
-        DeserializationOption::Filter(filter)
-    );
-
-    http.end();
-
-    if (err) {
-        _lastError = String("graph JSON parse failed: ") + err.c_str();
-        return false;
-    }
-
-    return true;
-}
-
 bool LibreLinkUpClient::updateNow() {
     if (_updating) {
         return false;
@@ -548,11 +333,7 @@ bool LibreLinkUpClient::startAsyncRequest(
     config.user_data = this;
     config.is_async = true;
     config.timeout_ms = 15000;
-    config.cert_pem = LIBRELINKUP_GTS_ROOT_R4;
-
-    // Important: LibreLinkUp may return headers larger than ESP-IDF's default buffer.
-    config.buffer_size = 4096;
-    config.buffer_size_tx = 4096;
+    config.skip_cert_common_name_check = true;
 
     _asyncClient = esp_http_client_init(&config);
     if (!_asyncClient) {
@@ -614,21 +395,7 @@ bool LibreLinkUpClient::finishAsyncResponse() {
     _asyncClient = nullptr;
 
     if (status < 200 || status >= 300) {
-        const char* phaseName = "idle";
-        switch (_asyncPhase) {
-            case AsyncPhase::Login:
-                phaseName = "login";
-                break;
-            case AsyncPhase::Connections:
-                phaseName = "connections";
-                break;
-            case AsyncPhase::Graph:
-                phaseName = "graph";
-                break;
-            default:
-                break;
-        }
-        failAsync(String("HTTP ") + status + " during " + phaseName + ": " + _asyncResponse);
+        failAsync("HTTP " + String(status) + ": " + _asyncResponse);
         return false;
     }
 
@@ -646,37 +413,28 @@ bool LibreLinkUpClient::finishAsyncResponse() {
 }
 
 bool LibreLinkUpClient::handleAsyncLogin() {
-    JsonDocument filter;
-    filter["status"] = true;
-    filter["data"]["redirect"] = true;
-    filter["data"]["region"] = true;
-    filter["data"]["user"]["id"] = true;
-    filter["data"]["authTicket"]["token"] = true;
-    filter["data"]["step"]["type"] = true;
-    filter["data"]["step"]["props"]["titleKey"] = true;
-
     JsonDocument doc;
-    DeserializationError err = deserializeJson(
-        doc,
-        _asyncResponse,
-        DeserializationOption::Filter(filter)
-    );
-
+    DeserializationError err = deserializeJson(doc, _asyncResponse);
     if (err) {
         failAsync(String("login JSON parse failed: ") + err.c_str());
         return false;
     }
 
-    String authToken;
-    String accountId;
-    String error;
-    if (!parseLoginResponse(doc, authToken, accountId, error)) {
-        failAsync(error);
+    if (doc["data"]["redirect"].as<bool>()) {
+        failAsync(String("login redirected to region: ")
+            + doc["data"]["region"].as<const char*>());
         return false;
     }
 
-    _authToken = authToken;
-    _accountId = accountId;
+    const char* token = doc["data"]["authTicket"]["token"] | nullptr;
+    const char* userId = doc["data"]["user"]["id"] | nullptr;
+    if (!token || !userId) {
+        failAsync("login response missing authTicket token or user id");
+        return false;
+    }
+
+    _authToken = token;
+    _accountId = sha256Hex(String(userId));
     return startAsyncRequest("GET", "/llu/connections", "", AsyncPhase::Connections);
 }
 
@@ -788,93 +546,109 @@ bool LibreLinkUpClient::login() {
         return false;
     }
 
-    JsonDocument filter;
-    filter["status"] = true;
-    filter["data"]["redirect"] = true;
-    filter["data"]["region"] = true;
-    filter["data"]["user"]["id"] = true;
-    filter["data"]["authTicket"]["token"] = true;
-    filter["data"]["step"]["type"] = true;
-    filter["data"]["step"]["props"]["titleKey"] = true;
-
     JsonDocument doc;
-    DeserializationError err = deserializeJson(
-        doc,
-        response,
-        DeserializationOption::Filter(filter)
-    );
+    DeserializationError err = deserializeJson(doc, response);
+    
+    // TEMP parse diagnostics (no secret values printed).
+    {
+        const char* tk = doc["data"]["authTicket"]["token"] | "";
+        const char* uid = doc["data"]["user"]["id"] | "";
+        Serial.printf("[parse] err=%s status=%d dataNull=%d ticketNull=%d tokenLen=%u userIdLen=%u\n",
+                      err.c_str(), (int)(doc["status"] | -1),
+                      (int) doc["data"].isNull(),
+                      (int) doc["data"]["authTicket"].isNull(),
+                      (unsigned) strlen(tk), (unsigned) strlen(uid));
+        JsonObject root = doc.as<JsonObject>();
+        if (!root.isNull()) {
+            for (JsonPair kv : root) {
+                Serial.printf("[parse]   root key='%s'\n", kv.key().c_str());
+            }
+        }
+        JsonObject data = doc["data"].as<JsonObject>();
+        if (!data.isNull()) {
+            for (JsonPair kv : data) {
+                Serial.printf("[parse]   data key='%s'\n", kv.key().c_str());
+            }
+        }
+    }
 
+    if (err) {
+        _lastError = String("login JSON parse failed: ") + err.c_str();
+        return false;
+
+        const char* uid = doc["data"]["user"]["id"] | "";
+        Serial.printf("[parse] err=%s status=%d dataNull=%d ticketNull=%d tokenLen=%u userIdLen=%u\n",
+                      err.c_str(), (int)(doc["status"] | -1),
+                      (int) doc["data"].isNull(),
+                      (int) doc["data"]["authTicket"].isNull(),
+                      (unsigned) strlen(tk), (unsigned) strlen(uid));
+        JsonObject root = doc.as<JsonObject>();
+        if (!root.isNull()) {
+            for (JsonPair kv : root) {
+                Serial.printf("[parse]   root key='%s'\n", kv.key().c_str());
+            }
+        }
+        JsonObject data = doc["data"].as<JsonObject>();
+        if (!data.isNull()) {
+            for (JsonPair kv : data) {
+                Serial.printf("[parse]   data key='%s'\n", kv.key().c_str());
+            }
+        }
+    }
+
+    if (err) {
+        _lastError = String("login JSON parse failed: ") + err.c_str();
+        return false;
+    
     if (err) {
         _lastError = String("login JSON parse failed: ") + err.c_str();
         return false;
     }
 
-    String authToken;
-    String accountId;
-    String error;
-    if (!parseLoginResponse(doc, authToken, accountId, error)) {
-        _lastError = error;
+    if (doc["data"]["redirect"].as<bool>()) {
+        _lastError = String("login redirected to region: ")
+            + doc["data"]["region"].as<const char*>();
         return false;
     }
 
-    _authToken = authToken;
-    _accountId = accountId;
+    const char* token = doc["data"]["authTicket"]["token"] | nullptr;
+    const char* userId = doc["data"]["user"]["id"] | nullptr;
+    if (!token || !userId) {
+        _lastError = "login response missing authTicket token or user id";
+        return false;
+    }
+
+    _authToken = token;
+    _accountId = sha256Hex(String(userId));
     return true;
 }
 
-bool LibreLinkUpClient::getLatestReading(
-    LibreLinkUpReading& reading,
-    uint8_t connectionIndex
-) {
+bool LibreLinkUpClient::getLatestReading(LibreLinkUpReading& reading, uint8_t connectionIndex) {
     if (_authToken.length() == 0 && !login()) {
         return false;
     }
 
     String patientId;
     String patientName;
-
     if (!getConnection(connectionIndex, patientId, patientName)) {
         return false;
     }
 
+    String response;
+    if (!request("GET", "/llu/connections/" + patientId + "/graph", "", response)) {
+        return false;
+    }
+
     JsonDocument doc;
-
-    #if defined(ESP8266)
-        JsonDocument filter;
-        filter["data"]["connection"]["glucoseMeasurement"]["Timestamp"] = true;
-        filter["data"]["connection"]["glucoseMeasurement"]["ValueInMgPerDl"] = true;
-        filter["data"]["connection"]["glucoseMeasurement"]["Value"] = true;
-        filter["data"]["connection"]["glucoseMeasurement"]["TrendArrow"] = true;
-        filter["data"]["connection"]["glucoseMeasurement"]["MeasurementColor"] = true;
-
-
-        if (!requestJson(
-            "GET",
-            "/llu/connections/" + patientId + "/graph",
-            "",
-            doc,
-            &filter
-        )) {
-            return false;
-        }
-    #else
-        if (!requestJson(
-            "GET",
-            "/llu/connections/" + patientId + "/graph",
-            "",
-            doc
-        ))
-        {
-            return false;
-        }
-    #endif
+    DeserializationError err = deserializeJson(doc, response);
+    if (err) {
+        _lastError = String("graph JSON parse failed: ") + err.c_str();
+        return false;
+    }
 
     JsonVariant raw = doc["data"]["connection"]["glucoseMeasurement"];
-
     if (raw.isNull()) {
-        String debug;
-        serializeJson(doc, debug);
-        _lastError = "graph response missing glucoseMeasurement; parsed=" + debug;
+        _lastError = "graph response missing glucoseMeasurement";
         return false;
     }
 
@@ -886,7 +660,6 @@ bool LibreLinkUpClient::getLatestReading(
     reading.measurementColor = raw["MeasurementColor"] | 0;
     reading.trend = libreLinkUpTrendArrowFromInt(reading.trendArrow);
     reading.color = libreLinkUpMeasurementColorFromInt(reading.measurementColor);
-
     return true;
 }
 
@@ -954,97 +727,6 @@ const String& LibreLinkUpClient::accountId() const {
     return _accountId;
 }
 
-bool LibreLinkUpClient::requestJson(
-    const String& method,
-    const String& path,
-    const String& body,
-    JsonDocument& doc,
-    JsonDocument* filter
-) {
-#if defined(ESP32)
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-#elif defined(ESP8266)
-    BearSSL::WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    secureClient.setBufferSizes(2048, 1024);
-#endif
-
-    HTTPClient http;
-    String url = _baseUrl + path;
-
-    if (!http.begin(secureClient, url)) {
-        _lastError = "HTTP begin failed for " + url;
-        return false;
-    }
-
-    http.setTimeout(25000);
-    http.setReuse(false);
-
-#if defined(ESP8266)
-    http.useHTTP10(true);
-#endif
-
-    http.addHeader("product", "llu.android");
-    http.addHeader("version", _version);
-    http.addHeader("Accept-Encoding", "identity");
-    http.addHeader("Cache-Control", "no-cache");
-    http.addHeader("Connection", "close");
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader(
-        "User-Agent",
-        "Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36"
-    );
-
-    if (_authToken.length() > 0) {
-        http.addHeader("authorization", "Bearer " + _authToken);
-    }
-
-    if (_accountId.length() > 0) {
-        http.addHeader("Account-Id", _accountId);
-    }
-
-    int status = method == "POST" ? http.POST(body) : http.GET();
-
-    if (status < 200 || status >= 300) {
-        String errorBody = http.getString();
-        _lastError = "HTTP " + String(status) + " for " + path + ": " + errorBody;
-        http.end();
-        return false;
-    }
-
-    DeserializationError err;
-
-#if defined(ESP32)
-    String response = http.getString();
-    if (filter) {
-        err = deserializeJson(doc, response, DeserializationOption::Filter(*filter));
-    } else {
-        err = deserializeJson(doc, response);
-    }
-#else
-    if (filter) {
-        err = deserializeJson(
-            doc,
-            http.getStream(),
-            DeserializationOption::Filter(*filter)
-        );
-    } else {
-        err = deserializeJson(doc, http.getStream());
-    }
-#endif
-
-    http.end();
-
-    if (err) {
-        _lastError = String(path) + " JSON parse failed: " + err.c_str();
-        return false;
-    }
-
-    return true;
-}
-
 bool LibreLinkUpClient::request(
     const String& method,
     const String& path,
@@ -1058,7 +740,6 @@ bool LibreLinkUpClient::request(
 #elif defined(ESP8266)
     BearSSL::WiFiClientSecure secureClient;
     secureClient.setInsecure();
-    secureClient.setBufferSizes(2048, 1024);
     HTTPClient http;
 #endif
 
@@ -1068,14 +749,14 @@ bool LibreLinkUpClient::request(
         return false;
     }
 
-    http.setTimeout(15000);
-    http.setReuse(false);
-
     http.addHeader("product", "llu.android");
     http.addHeader("version", _version);
+    // Arduino HTTP stacks do not transparently decompress gzip, so we must ask
+    // the API for an uncompressed (identity) body or deserializeJson() will fail
+    // on the compressed bytes.
     http.addHeader("Accept-Encoding", "identity");
     http.addHeader("Cache-Control", "no-cache");
-    http.addHeader("Connection", "close");
+    http.addHeader("Connection", "Keep-Alive");
     http.addHeader("Content-Type", "application/json");
     http.addHeader(
         "User-Agent",
@@ -1111,37 +792,34 @@ bool LibreLinkUpClient::getConnection(
     String& patientId,
     String& patientName
 ) {
-    JsonDocument filter;
-    filter["data"][0]["patientId"] = true;
-    filter["data"][0]["firstName"] = true;
-    filter["data"][0]["lastName"] = true;
+    String response;
+    if (!request("GET", "/llu/connections", "", response)) {
+        return false;
+    }
 
     JsonDocument doc;
-
-    if (!requestJson("GET", "/llu/connections", "", doc, &filter)) {
+    DeserializationError err = deserializeJson(doc, response);
+    if (err) {
+        _lastError = String("connections JSON parse failed: ") + err.c_str();
         return false;
     }
 
     JsonArray connections = doc["data"].as<JsonArray>();
-
     if (connections.isNull() || index >= connections.size()) {
         _lastError = "no LibreLinkUp connection at index " + String(index);
         return false;
     }
 
     JsonVariant connection = connections[index];
-
     patientId = connection["patientId"].as<String>();
     String firstName = connection["firstName"].as<String>();
     String lastName = connection["lastName"].as<String>();
-
     patientName = firstName + (lastName.length() ? " " + lastName : "");
 
     if (patientId.length() == 0) {
         _lastError = "connection missing patientId";
         return false;
     }
-
     return true;
 }
 
